@@ -21,13 +21,14 @@ namespace IAMRefactor.Controllers
             aLMService = _aLMService;
         }
 
-        [HttpGet(Name = "IamLogin")]
+        [HttpGet]
+        [Route("IamLogin")]
         public string IamLogin()
         {
             var formatSettings = _configuration.GetSection("IAM").Get<IAMConfigrationModel>();
            var result= aLMService.GenerateBaseUrlForClient(formatSettings);
             return result;
         }
-      
+
     }
 }

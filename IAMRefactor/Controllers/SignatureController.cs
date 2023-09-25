@@ -17,12 +17,15 @@ namespace IAMRefactor.Controllers
             signatureService = _signatureService;
         }
 
-        [HttpPost(Name = "Sign")]
+        [HttpPost]
+        [Route("Sign")]
         public async Task<string> Sign([FromBody] SignModel signModel)
         {
           var result= await signatureService.Sign(signModel);
             return result;
         }
-        
+
+  
+
     }
 }

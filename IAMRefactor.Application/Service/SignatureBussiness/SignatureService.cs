@@ -29,11 +29,33 @@ namespace IAMRefactor.Application.Service.SignatureBussiness
                 throw new ArgumentNullException(nameof(signModel));
 
             }
-
-            byte[] inArrayBytes = null;
             var URL = signModel.SignHashUrl;
+            Signature sig = null;
+            var signatureHash = PreperSignHash(signModel,out sig);
+            var signRequest= PreperSignObject(signModel,  signatureHash);
+            var result = await signHashRequest.Post(signRequest, URL);
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(signModel));
+            }
+            byte[] inArrayBytes = result;
+            EmbedSignature emHash = new EmbedSignature();
+            var signByte = emHash.EmbedHash(signatureHash.ReturnBytes, inArrayBytes, sig);
+            //before LTV PDF
+            var beforeLTV = signByte.SignedBytes;
+            if (!string.IsNullOrEmpty(signModel.TSAurl))
+            {
+                var pades = emHash.AddLtv(signByte.SignedBytes, 80000, "SHA256", signModel.TSAurl, null, null, sig);
+                return Convert.ToBase64String(pades.PadesSignedBytes);
+            }
+            return Convert.ToBase64String(beforeLTV);
 
-            byte[] originalBytes = Convert.FromBase64String(signModel.PdfFile);
+
+
+        }
+
+        private ExtractResponse PreperSignHash(SignModel signModel ,out Signature sig)
+        {
 
             byte[] backImage = null;
 
@@ -41,21 +63,26 @@ namespace IAMRefactor.Application.Service.SignatureBussiness
             {
                 backImage = Convert.FromBase64String(signModel.BackImage);
             }
-
+            byte[] originalBytes = Convert.FromBase64String(signModel.PdfFile);
+         
             ExtractHash hashEx = new ExtractHash();
             SignatureAppearance app1 = new SignatureAppearance(true, new rectangle(signModel.RectangleX1, signModel.RectangleY1, signModel.RectangleX2, signModel.RectangleY2), signModel.PageNumber, backImage);
 
-            Signature sig = new Signature("firstSignature", false, app1);
+             sig = new Signature("firstSignature", false, app1);
 
             sig.setSignedBy(signModel.PersonFirstName, signModel.PersonSecondName);
             sig.Reason = signModel.Reason;
             sig.RTL = signModel.RTL;
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             ExtractResponse signatureHash = hashEx.AddEmptySigAndCalculateHash(originalBytes, sig, 80000);
+
+            return signatureHash;
+        }
+
+        private SignHashRequest PreperSignObject(SignModel signModel, ExtractResponse signatureHash)
+        {
+ 
             var file = Convert.FromBase64String(signatureHash.ReturnString);
-
-
-
             SignHashRequest signRequest = new SignHashRequest
             {
                 AdssURL = signModel.SignHashRequestAdssUrl,
@@ -73,25 +100,7 @@ namespace IAMRefactor.Application.Service.SignatureBussiness
                 PrivateKeyPassword = signModel.PrivateKeyPassword
             };
 
-            var result = await signHashRequest.Post(signRequest, URL);
-            if (result == null)
-            {
-                throw new ArgumentNullException(nameof(signModel));
-            }
-            inArrayBytes = result;
-            EmbedSignature emHash = new EmbedSignature();
-            var y = emHash.EmbedHash(signatureHash.ReturnBytes, inArrayBytes, sig);
-            //before LTV PDF
-            var beforeLTV = y.SignedBytes;
-            if (!string.IsNullOrEmpty(signModel.TSAurl))
-            {
-                var pades = emHash.AddLtv(y.SignedBytes, 80000, "SHA256", signModel.TSAurl, null, null, sig);
-                return Convert.ToBase64String(pades.PadesSignedBytes);
-            }
-            return Convert.ToBase64String(beforeLTV);
-
-
-
+            return signRequest;
         }
     }
 }
